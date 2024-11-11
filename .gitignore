@@ -1,3 +1,5 @@
 /dbms_venv
 
-.env.yash
+.env
+
+/__pycache__

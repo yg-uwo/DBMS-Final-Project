@@ -5,7 +5,8 @@ cursor = connection.cursor()
 
 
 
-cursor.execute("INSERT INTO Testing (symbol) VALUES (%s)", ("AAPL"))
+def add_company_info():
+    print("G6TFGYSU")
 
 
 

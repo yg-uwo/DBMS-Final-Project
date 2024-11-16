@@ -4,11 +4,109 @@ import pandas as pd
 connection = create_connection()
 cursor = connection.cursor()
 
-def insert_stock_data(symbol, company_name):
-    cursor.execute("INSERT INTO Stocks (symbol, company_name) VALUES (%s, %s)", (symbol, company_name))
-    stock_id = cursor.lastrowid
+# def insert_stock_data(symbol, company_name):
+#     cursor.execute("INSERT INTO Stocks (symbol, company_name) VALUES (%s, %s)", (symbol, company_name))
+#     stock_id = cursor.lastrowid
+#     connection.commit()
+#     return stock_id
+
+def add_company_info(ticker, company_id):
+    connection = create_connection()
+    cursor = connection.cursor()
+    apple = yf.Ticker(ticker)
+    info = apple.info
+
+    company_info_data = (
+        ticker,
+        info.get("longName"),
+        info.get("sector"),
+        info.get("industry"),
+        info.get("country"),
+        info.get("website")
+    )
+
+    cursor.execute("""
+        INSERT INTO company_info (ticker, long_name, sector, industry, country, website)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            long_name = VALUES(long_name),
+            sector = VALUES(sector),
+            industry = VALUES(industry),
+            country = VALUES(country),
+            website = VALUES(website)
+    """, company_info_data)
+
+    cursor.execute("SELECT company_id FROM company_info WHERE ticker = %s", (ticker,))
+    company_id = cursor.fetchone()[0]
     connection.commit()
-    return stock_id
+    return company_id
+
+def add_income_statement(ticker, company_id):
+    apple = yf.Ticker(ticker)
+    income_statement = apple.financials.T  # Transposed for row-wise iteration
+
+    for date_index, row in income_statement.iterrows():
+        end_date = pd.to_datetime(date_index, errors='coerce')
+
+        if pd.isna(end_date):
+            print(f"Skipping invalid date: {date_index}")
+            continue
+        else:
+            end_date = end_date.date() 
+
+        fields = ['company_id', 'end_date']
+        values = [company_id, end_date]
+        
+        for column_name, value in row.items():
+            if pd.notnull(value):
+                #Change column names to be matched with db_col names
+                field_name = column_name.replace(" ", "_").replace(".", "").replace("-", "_")
+                fields.append(field_name)
+                values.append(value)
+
+        sql_query = f"""
+            INSERT INTO income_statement ({', '.join(fields)})
+            VALUES ({', '.join(['%s'] * len(values))})
+        """
+        cursor.execute(sql_query, values)
+    connection.commit()
+
+
+def add_earnings_data(ticker, company_id):
+    stock = yf.Ticker(ticker)
+    earnings = stock.earnings_dates 
+    # print("Raw Earnings Data:\n", earnings)
+    for date, data in earnings.iterrows():
+        earnings_date = date.date() 
+
+        # print(earnings_date)
+
+        eps_estimate = data.get('EPS Estimate')
+        reported_eps = data.get('Reported EPS')
+        surprise_percentage = data.get('Surprise(%)')
+
+        # Replace NaN values with None (which will insert NULL in the database)
+        eps_estimate = None if pd.isna(eps_estimate) else eps_estimate
+        reported_eps = None if pd.isna(reported_eps) else reported_eps
+        surprise_percentage = None if pd.isna(surprise_percentage) else surprise_percentage
+
+
+        # Prepare the data for insertion into the database
+        earnings_data = (
+            company_id,
+            earnings_date,
+            eps_estimate,
+            reported_eps,
+            surprise_percentage
+        )
+
+        # print("VALUE TO BE INSERTED\n",earnings_data)
+
+        cursor.execute("""
+            INSERT INTO earnings_data (company_id, fiscal_period, eps_estimate, reported_eps, surprise_percentage)
+            VALUES (%s, %s, %s, %s, %s)
+        """, earnings_data)
+    connection.commit()
 
 def insert_stock_price(stock_id, stock_data):
     for date, row in stock_data.iterrows():
@@ -19,11 +117,11 @@ def insert_stock_price(stock_id, stock_data):
         """, (
             stock_id,
             date,
-            float(row['Open'].iloc[0]),
-            float(row['Close'].iloc[0]),
-            float(row['High'].iloc[0]),
-            float(row['Low'].iloc[0]),
-            float(row['Volume'].iloc[0])
+            float(row['Open']),
+            float(row['Close']),
+            float(row['High']),
+            float(row['Low']),
+            float(row['Volume'])
         ))
     connection.commit()
 
@@ -156,20 +254,30 @@ def insert_cash_flow(stock_id, cash_flow_data):
 def main():
     symbol = "AAPL" # Company Name 
     ticker = yf.Ticker(symbol)
-
+    company_id = add_company_info(symbol, None)
     stock_data = ticker.history(start="2020-01-01", end="2023-01-01")
+    stock_id = add_company_info(symbol, None)
 
+    # Add Income Statement
+    add_income_statement(symbol, company_id)
+
+    # Add Earnings Data
+    add_earnings_data(symbol, company_id)
+
+    # Balance Sheet Data
     balance_sheet_data = ticker.balance_sheet.T
     balance_sheet_data = balance_sheet_data.to_dict(orient="index")
 
+    #Cash Flow 
     cash_flow_data = ticker.cash_flow.T
     cash_flow_data = cash_flow_data.to_dict(orient="index")
 
-    stock_id = insert_stock_data(symbol, "Apple Inc.")
-    #insert_stock_price(stock_id, stock_data)
-    #insert_balance_sheet(stock_id, balance_sheet_data)
+    insert_stock_price(stock_id, stock_data)
+    print("Stock Price inserted")
+    insert_balance_sheet(stock_id, balance_sheet_data)
+    print("Balance Sheet inserted")
     insert_cash_flow(stock_id, cash_flow_data)
-
+    print("Cash Flow Inserted")
     print(f"Data for {symbol} inserted successfully into the databases.")
 
 if __name__ == "__main__":

@@ -8,26 +8,6 @@ CREATE TABLE Stocks (
     company_name VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE BalanceSheet (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    stock_id INT,
-    date DATE,
-    total_assets BIGINT,
-    total_liabilities BIGINT,
-    total_equity BIGINT,
-    FOREIGN KEY (stock_id) REFERENCES Stocks(id)
-);
-
-CREATE TABLE CashFlow (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    stock_id INT,
-    date DATE,
-    net_cash_flow_operating BIGINT,
-    net_cash_flow_investing BIGINT,
-    net_cash_flow_financing BIGINT,
-    FOREIGN KEY (stock_id) REFERENCES Stocks(id)
-);
-
 CREATE TABLE StockPrices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     stock_id INT,
@@ -37,21 +17,13 @@ CREATE TABLE StockPrices (
     high_price DECIMAL(10, 2),
     low_price DECIMAL(10, 2),
     volume BIGINT,
-    FOREIGN KEY (stock_id) REFERENCES Stocks(id)
+    FOREIGN KEY (stock_id) REFERENCES company_info(company_id)
 );
-
-DESC BalanceSheet;
-SHOW TABLES;
-
-SET SQL_SAFE_UPDATES = 0;
-DROP table CashFlow;
-
-SELECT * FROM BalanceSheet order by date;
-
 
 CREATE TABLE BalanceSheet (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    
+    stock_id INT,
+    date DATE,
     -- Equity and Share Information
     ordinary_shares_number BIGINT,
     common_stock_equity DECIMAL(15, 2),
@@ -80,13 +52,14 @@ CREATE TABLE BalanceSheet (
     working_capital DECIMAL(15, 2),
     total_capitalization DECIMAL(15, 2),
     income_tax_payable DECIMAL(15, 2),
-    other_current_liabilities DECIMAL(15, 2)
+    other_current_liabilities DECIMAL(15, 2),
+    FOREIGN KEY (stock_id) REFERENCES company_info(company_id)
 );
 
 ALTER TABLE BalanceSheet
 ADD COLUMN stock_id INT,
 ADD COLUMN date DATE,
-ADD CONSTRAINT fk_stock_id FOREIGN KEY (stock_id) REFERENCES stocks(id);
+ADD CONSTRAINT fk_stock_id FOREIGN KEY (stock_id) REFERENCES company_info(company_id);
 
 CREATE TABLE CashFlow (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -119,3 +92,4 @@ CREATE TABLE CashFlow (
 );
 
 SELECT * From CashFlow;
+SELECT * FROM BalanceSheet order by date;

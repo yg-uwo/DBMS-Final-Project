@@ -64,16 +64,13 @@ RENAME COLUMN Net_Income_From_Continuing_And_Discontinued_Operations to Net_Inco
 ALTER TABLE income_statement
 RENAME COLUMN Diluted_NI_Avail_to_Common_Stockholders to Diluted_NI_Availto_Com_Stockholders;
 
--- Diluted_NI_Availto_Com_Stockholders
--- DROP TABLE income_statement;
-
-CREATE TABLE IF NOT EXISTS earnings_data (
+CREATE TABLE dividends_data (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    company_id INT,
-    fiscal_period DATE, 
-    eps_estimate FLOAT,
-    reported_eps FLOAT,
-    surprise_percentage FLOAT,
+    company_id INT,            
+    dividend_date DATE,                   
+    dividend_amount DECIMAL(20, 4),      
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES company_info(company_id)
 );
 
@@ -81,7 +78,7 @@ CREATE TABLE IF NOT EXISTS earnings_data (
 -- DROP TABLE earnings_data; 
 
 SELECT * FROM company_info;
-SELECT * FROM earnings_data;
+SELECT * FROM dividends_data;
 SELECT * FROM income_statement;
 
 -- TRUNCATE table earnings_data;

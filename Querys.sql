@@ -88,7 +88,7 @@ CREATE TABLE CashFlow (
     income_tax_paid DECIMAL(15, 2),
 
     -- Foreign key constraint (if stock_id references another table)
-    FOREIGN KEY (stock_id) REFERENCES stocks(id)
+    FOREIGN KEY (stock_id) REFERENCES company_info(company_id);
 );
 
 SELECT * From CashFlow;

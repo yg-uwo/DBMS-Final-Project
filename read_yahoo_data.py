@@ -72,42 +72,6 @@ def add_income_statement(ticker, company_id):
     connection.commit()
 
 
-def add_earnings_data(ticker, company_id):
-    stock = yf.Ticker(ticker)
-    earnings = stock.earnings_dates 
-    # print("Raw Earnings Data:\n", earnings)
-    for date, data in earnings.iterrows():
-        earnings_date = date.date() 
-
-        # print(earnings_date)
-
-        eps_estimate = data.get('EPS Estimate')
-        reported_eps = data.get('Reported EPS')
-        surprise_percentage = data.get('Surprise(%)')
-
-        # Replace NaN values with None (which will insert NULL in the database)
-        eps_estimate = None if pd.isna(eps_estimate) else eps_estimate
-        reported_eps = None if pd.isna(reported_eps) else reported_eps
-        surprise_percentage = None if pd.isna(surprise_percentage) else surprise_percentage
-
-
-        # Prepare the data for insertion into the database
-        earnings_data = (
-            company_id,
-            earnings_date,
-            eps_estimate,
-            reported_eps,
-            surprise_percentage
-        )
-
-        # print("VALUE TO BE INSERTED\n",earnings_data)
-
-        cursor.execute("""
-            INSERT INTO earnings_data (company_id, fiscal_period, eps_estimate, reported_eps, surprise_percentage)
-            VALUES (%s, %s, %s, %s, %s)
-        """, earnings_data)
-    connection.commit()
-
 def insert_stock_price(stock_id, stock_data):
     for date, row in stock_data.iterrows():
         date = date.to_pydatetime()
@@ -251,18 +215,46 @@ def insert_cash_flow(stock_id, cash_flow_data):
         ))
     connection.commit()
 
+def insert_dividends_data(ticker, company_id):
+    stock = yf.Ticker(ticker)
+
+    # Get dividends data
+    dividends = stock.dividends
+
+    if dividends.empty:
+        print(f"No dividends data available for {ticker}")
+        return
+
+    for date, amount in dividends.items():
+        # Ensure the date is in the correct format
+        dividend_date = pd.to_datetime(date).date()
+
+        # Prepare the data for insertion into the database
+        dividend_data = (
+            company_id,
+            dividend_date,
+            amount
+        )
+
+        # Insert data into the database
+        cursor.execute("""
+            INSERT INTO dividends_data (company_id, dividend_date, dividend_amount)
+            VALUES (%s, %s, %s)
+        """, dividend_data)
+
+    # Commit the transaction to the database
+    connection.commit()
+    print(f"Dividends data for {ticker} inserted successfully.")
+
 def main():
     symbol = "AAPL" # Company Name 
     ticker = yf.Ticker(symbol)
     company_id = add_company_info(symbol, None)
     stock_data = ticker.history(start="2020-01-01", end="2023-01-01")
-    stock_id = add_company_info(symbol, None)
-
+    stock_id = add_company_info(symbol, None)\
+    
     # Add Income Statement
     add_income_statement(symbol, company_id)
-
-    # Add Earnings Data
-    add_earnings_data(symbol, company_id)
 
     # Balance Sheet Data
     balance_sheet_data = ticker.balance_sheet.T
@@ -272,6 +264,7 @@ def main():
     cash_flow_data = ticker.cash_flow.T
     cash_flow_data = cash_flow_data.to_dict(orient="index")
 
+    insert_dividends_data(symbol,company_id)
     insert_stock_price(stock_id, stock_data)
     print("Stock Price inserted")
     insert_balance_sheet(stock_id, balance_sheet_data)
@@ -279,6 +272,7 @@ def main():
     insert_cash_flow(stock_id, cash_flow_data)
     print("Cash Flow Inserted")
     print(f"Data for {symbol} inserted successfully into the databases.")
+
 
 if __name__ == "__main__":
     main()
